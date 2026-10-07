@@ -7,6 +7,7 @@ import {
   type SubtitleCue,
   type SubtitleProject,
 } from "../models";
+import { normalizeCues } from "../ordering";
 import { detectFormat, parseSubtitles } from "../parsers/subtitleParser";
 import { projectRepository } from "../repositories/projectRepository";
 import { downloadSubtitles } from "../services/exportService";
@@ -27,6 +28,9 @@ export class SubtitleMeterViewModel {
     project: SubtitleProject,
     phase: MeterState["phase"] = "editing",
   ) {
+    // 所有修改都在此落定：重排并重编号，编辑、检查、快照、导出共用同一套序号。
+    // 对快照恢复同样是幂等的——标准序只取决于时间与稳定 id，编号必然回到快照当时。
+    project.cues = normalizeCues(project.cues);
     project.updatedAt = Date.now();
     const issues = detectIssues(project.cues);
     this.publish({ project, issues, phase, notice: "" });
@@ -43,8 +47,18 @@ export class SubtitleMeterViewModel {
   }
   async restore() {
     try {
-      const project = await projectRepository.load();
-      if (project)
+      const stored = await projectRepository.load();
+      if (stored) {
+        // 迁移旧版本本地库：把当前项目与每个历史快照都归到同一标准序，
+        // 保证老数据恢复后界面、提示、快照、导出口径仍然一致。
+        const project: SubtitleProject = {
+          ...stored,
+          cues: normalizeCues(stored.cues),
+          versions: stored.versions.map((version) => ({
+            ...version,
+            cues: normalizeCues(version.cues),
+          })),
+        };
         this.publish({
           project,
           issues: detectIssues(project.cues),
@@ -52,6 +66,7 @@ export class SubtitleMeterViewModel {
           selectedId: project.cues[0]?.id ?? null,
           notice: "已恢复上次编辑",
         });
+      }
     } catch {
       this.publish({ notice: "本地项目暂时无法读取，可继续导入字幕文件" });
     }
@@ -108,7 +123,8 @@ export class SubtitleMeterViewModel {
         id: `v-${Date.now()}`,
         label: `快照 ${project.versions.length + 1}`,
         savedAt: Date.now(),
-        cues: structuredClone(project.cues),
+        // 连同当时的标准序与编号一起固化；回退后编号即恢复成快照时的样子
+        cues: normalizeCues(structuredClone(project.cues)),
       },
     ];
     await this.commit({ ...project, versions });
@@ -118,6 +134,7 @@ export class SubtitleMeterViewModel {
     const project = this.state.project,
       version = project?.versions.find((item) => item.id === id);
     if (!project || !version) return;
+    // 直接采用快照中固化的顺序与编号；commit 再做一次确定性标准化（幂等）
     await this.commit({ ...project, cues: structuredClone(version.cues) });
     this.publish({ notice: `已恢复${version.label}` });
   }

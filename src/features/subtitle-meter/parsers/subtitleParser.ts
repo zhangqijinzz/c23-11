@@ -1,4 +1,5 @@
 import type { Format, SubtitleCue } from "../models";
+import { normalizeCues } from "../ordering";
 import { parseTimestamp } from "./timecode";
 export function detectFormat(name: string): Format {
   const ext = name.toLowerCase().split(".").pop();
@@ -36,5 +37,6 @@ export function parseSubtitles(raw: string, format: Format): SubtitleCue[] {
     });
   }
   if (!cues.length) throw new Error("没有找到可用字幕条目");
-  return cues;
+  // id 按文件中的出现顺序保持稳定；index 与数组顺序统一交由标准序决定
+  return normalizeCues(cues);
 }

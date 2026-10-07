@@ -1,5 +1,6 @@
 import type { SubtitleCue, SubtitleIssue } from "../models";
-export function detectIssues(cues: SubtitleCue[]): SubtitleIssue[] {
+import { normalizeCues } from "../ordering";
+export function detectIssues(rawCues: readonly SubtitleCue[]): SubtitleIssue[] {
   const issues: SubtitleIssue[] = [];
   const add = (
     cue: SubtitleCue,
@@ -14,7 +15,9 @@ export function detectIssues(cues: SubtitleCue[]): SubtitleIssue[] {
       severity,
       message,
     });
-  const ordered = [...cues].sort((a, b) => a.startMs - b.startMs);
+  // 统一走标准序（开始→结束→稳定 id），提示里引用的序号
+  // 与条目列表、导出文件完全一致；时间相同也有确定顺序。
+  const ordered = normalizeCues(rawCues);
   ordered.forEach((cue, i) => {
     const duration = cue.endMs - cue.startMs,
       chars = [...cue.text.replace(/\s/g, "")].length;

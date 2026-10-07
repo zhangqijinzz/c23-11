@@ -21,6 +21,15 @@ describe("subtitle parser and formatter", () => {
     expect(cues).toHaveLength(2);
     expect(cues[0].startMs).toBe(500);
   });
+  it("orders and numbers blocks by time even if the file is shuffled", () => {
+    const raw =
+      "1\n00:00:08,000 --> 00:00:10,000\n晚\n\n2\n00:00:01,000 --> 00:00:03,000\n早";
+    const cues = parseSubtitles(raw, "srt");
+    expect(cues.map((c) => c.id)).toEqual(["cue-2", "cue-1"]);
+    expect(cues.map((c) => c.index)).toEqual([1, 2]);
+    // 导出序号与解析后的标准序号一致
+    expect(formatSubtitles(cues, "srt").split("\n")[0]).toBe("1");
+  });
   it("reports malformed and reversed timecodes", () => {
     expect(() => parseSubtitles("1\nwrong --> time\nOops", "srt")).toThrow(
       "无法解析时间码",
