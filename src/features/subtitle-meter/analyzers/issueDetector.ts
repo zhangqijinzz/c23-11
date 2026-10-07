@@ -1,3 +1,4 @@
+import { compareCues } from "../cueOrder";
 import type { SubtitleCue, SubtitleIssue } from "../models";
 export function detectIssues(cues: SubtitleCue[]): SubtitleIssue[] {
   const issues: SubtitleIssue[] = [];
@@ -14,7 +15,7 @@ export function detectIssues(cues: SubtitleCue[]): SubtitleIssue[] {
       severity,
       message,
     });
-  const ordered = [...cues].sort((a, b) => a.startMs - b.startMs);
+  const ordered = [...cues].sort(compareCues);
   ordered.forEach((cue, i) => {
     const duration = cue.endMs - cue.startMs,
       chars = [...cue.text.replace(/\s/g, "")].length;

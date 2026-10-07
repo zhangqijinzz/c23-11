@@ -1,3 +1,4 @@
+import { normalizeCueOrder } from "../cueOrder";
 import type { Format, SubtitleCue } from "../models";
 import { parseTimestamp } from "./timecode";
 export function detectFormat(name: string): Format {
@@ -36,5 +37,5 @@ export function parseSubtitles(raw: string, format: Format): SubtitleCue[] {
     });
   }
   if (!cues.length) throw new Error("没有找到可用字幕条目");
-  return cues;
+  return normalizeCueOrder(cues);
 }

@@ -1,4 +1,5 @@
 import { detectIssues } from "../analyzers/issueDetector";
+import { normalizeCueOrder } from "../cueOrder";
 import { formatSubtitles } from "../formatters/subtitleFormatter";
 import {
   emptyState,
@@ -27,13 +28,17 @@ export class SubtitleMeterViewModel {
     project: SubtitleProject,
     phase: MeterState["phase"] = "editing",
   ) {
-    project.updatedAt = Date.now();
-    const issues = detectIssues(project.cues);
-    this.publish({ project, issues, phase, notice: "" });
+    const normalized: SubtitleProject = {
+      ...project,
+      cues: normalizeCueOrder(project.cues),
+      updatedAt: Date.now(),
+    };
+    const issues = detectIssues(normalized.cues);
+    this.publish({ project: normalized, issues, phase, notice: "" });
     try {
-      await projectRepository.save(project);
+      await projectRepository.save(normalized);
     } catch {
-      if (this.state.project?.updatedAt === project.updatedAt) {
+      if (this.state.project?.updatedAt === normalized.updatedAt) {
         this.publish({
           phase: "error",
           notice: "本地保存失败；当前修改仍保留在页面中，请导出备份",
@@ -44,14 +49,16 @@ export class SubtitleMeterViewModel {
   async restore() {
     try {
       const project = await projectRepository.load();
-      if (project)
+      if (project) {
+        const cues = normalizeCueOrder(project.cues);
         this.publish({
-          project,
-          issues: detectIssues(project.cues),
+          project: { ...project, cues },
+          issues: detectIssues(cues),
           phase: "ready",
-          selectedId: project.cues[0]?.id ?? null,
+          selectedId: cues[0]?.id ?? null,
           notice: "已恢复上次编辑",
         });
+      }
     } catch {
       this.publish({ notice: "本地项目暂时无法读取，可继续导入字幕文件" });
     }
